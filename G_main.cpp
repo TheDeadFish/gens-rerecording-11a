@@ -2043,9 +2043,18 @@ void RedirectIOToConsole()
 }
 #endif
 
+#include <fcntl.h>
+#include <io.h>
 
 int PASCAL WinMain(HINSTANCE hInst,	HINSTANCE hPrevInst, LPSTR lpCmdLine, int nCmdShow) //note: nCmdShow is always one indicating that lpCmdLine contains something (even when it doesn't)
 {
+	// enable console
+	int hCrt; FILE *hf; AllocConsole();
+	hCrt = _open_osfhandle((long) GetStdHandle(
+		STD_OUTPUT_HANDLE),_O_TEXT);
+	hf = _fdopen( hCrt, "w" ); *stdout = *hf;
+	setvbuf( stdout, NULL, _IONBF, 0 );
+
 ///////////////////////////////////////////////////
 
 	SetErrorMode(SEM_FAILCRITICALERRORS); // Modif N. -- prevents "There is no disk in the drive." error spam if a file on a removed disk is in the recent ROMs list

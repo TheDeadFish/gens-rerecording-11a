@@ -7,6 +7,7 @@
 #include "Mem_S68k.h"
 #include "vdp_io.h"
 #include "luascript.h"
+#include "movie.h"
 
 #define uint32 unsigned int
 
@@ -169,11 +170,11 @@ void Print_Instruction( FILE *trace )
 
 static void GensTrace_trace()
 {
-	if(mapped[ hook_pc ] < 0x40)
-	{
+	//if(mapped[ hook_pc ] < 0x40)
+	//{
 		Print_Instruction( fp_trace );
-		mapped[ hook_pc ] ++;
-	}
+	//	mapped[ hook_pc ] ++;
+	//}
 }
 void GensTrace()
 {
@@ -238,9 +239,141 @@ static void trace_read_byte_internal()
 	}
 }
 
+unsigned int M68K_RD(unsigned int Adr)
+{
+	unsigned int val;
+	val = M68K_RW(Adr);
+	val <<= 16;
+	val |= M68K_RW(Adr + 2);
+	return val;
+}
+
+
+
+
+
+
+
+
+
+int frame_target = 0;
+int frame_current = 0;
+
+int frame_read_count;
+int frame_read_value[256];
+int frame_read_pc[256];
+
+void frame_read_reset()
+{
+	frame_target = M68K_RD(0xFFFE0C)+1;	
+	frame_read_count = 0;
+	memset(frame_read_value, 0, sizeof(frame_read_value));
+	memset(frame_read_pc, 0, sizeof(frame_read_pc));
+}
+
+int frame_read_delta()
+{
+	// determin best range
+	int bestCount = 0, bestIndex = 0, curIndex = 0;
+	for(int i = 0; i < frame_read_count; i++)
+	  if(frame_read_value[i] != frame_read_value[curIndex]) {
+		if((i-curIndex) > bestCount) { bestCount = (i-curIndex);
+			bestIndex = curIndex; curIndex = i;  }
+	} if(bestCount == 0) bestCount = frame_read_count;
+	
+	// display unmatched
+	if(bestCount != frame_read_count)
+	for(int i = 0; i < frame_read_count; i++) {
+	  printf("v: %X, %X\n", frame_read_value[i], frame_read_pc[i]); }
+	
+	// calculate the delta
+	int frame_value = frame_target;
+	if(bestCount) { frame_value = 
+		frame_read_value[bestIndex]; }
+	int delta = frame_value - frame_current;
+	frame_current = frame_value;
+	
+	// validate delta
+	if(delta != 1) printf("%d\n", delta);
+	return delta;
+}
+
+FILE* demo_output_file;
+
+
+void trace_read_vcount()
+{
+	if((MainMovie.Status!=MOVIE_PLAYING)
+	||((hook_pc == 0xB66))) return;
+	
+	frame_read_value[frame_read_count] = M68K_RD(0xFFFE0C);
+	frame_read_pc[frame_read_count] = hook_pc;
+	frame_read_count++;
+}
+
+/*
+void trace_read_vroutn()
+{
+	if(hook_pc == 0xB16) {
+		if(M68K_RB(0xFFF62A)) {
+			// next frame
+			frame_count = 0;
+			
+			//printf("frame\n");
+		
+		
+		} else {
+			// lag frame
+			
+			//printf("lag\n");
+			
+		}
+	}
+}*/
+
+void trace_read_pad()
+{
+	static unsigned char hook_value0;
+	static int pad_value_pend = -1;
+
+	if(hook_pc == 0x11FC) { 
+		hook_value0 = hook_value; }
+	if(hook_pc == 0x120C) { 
+	
+		// write prev value
+		if(pad_value_pend >= 0) {
+		
+			// write frame
+			short frame_value = frame_read_delta() |
+				(pad_value_pend << 8);
+			if(!demo_output_file) { demo_output_file = 
+				fopen("demo_out.bin", "wb"); }
+			fwrite(&frame_value, 1, 2, demo_output_file);
+			if(MainMovie.Status!=MOVIE_PLAYING) { frame_value = 0;
+				fwrite(&frame_value, 1, 2, demo_output_file); }	
+		}
+	
+	
+		// prepare next value
+		pad_value_pend = -1;
+		if(MainMovie.Status==MOVIE_PLAYING) 
+		{	
+			pad_value_pend = ((((hook_value0 << 2) & 0xC0) 
+				| (hook_value & 0x3F))) ^ 0xFF;
+			frame_read_reset();
+		}
+	}
+
+}
+
+#define HA_CHK4(val) (((hook_address-val)&~3)==0)
 
 void trace_read_byte()
 {
+	if(hook_address == 0xA10003) trace_read_pad();
+	if(HA_CHK4(0xFFFE0C)) trace_read_vcount();
+	//if(HA_CHK4(0xFFF62A)) trace_read_vroutn();
+
 	if( hook_trace && rd_mode )
 		trace_read_byte_internal();
 	CallRegisteredLuaMemHook(hook_address, 1, hook_value, LUAMEMHOOK_READ);
@@ -302,6 +435,9 @@ static void trace_read_word_internal()
 }
 void trace_read_word()
 {
+	if((hook_address & ~3) == 0xFFFE0C)
+		trace_read_vcount();
+
 	if( hook_trace && rd_mode )
 		trace_read_word_internal();
 	CallRegisteredLuaMemHook(hook_address, 2, hook_value, LUAMEMHOOK_READ);
@@ -364,6 +500,9 @@ static void trace_read_dword_internal()
 }
 void trace_read_dword()
 {
+	if((hook_address & ~3) == 0xFFFE0C)
+		trace_read_vcount();
+
 	if( hook_trace && rd_mode )
 		trace_read_dword_internal();
 	CallRegisteredLuaMemHook(hook_address, 4, hook_value, LUAMEMHOOK_READ);
