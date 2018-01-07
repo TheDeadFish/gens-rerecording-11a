@@ -742,7 +742,7 @@ tryAgain:
 			// MoveWindow / ResizeWindow code
 			SetWindowLong(hWnd, GWL_STYLE, GetWindowLong(hWnd, GWL_STYLE) | WS_OVERLAPPEDWINDOW);
 			SetRect(&r, 0, 0, 320 * ((*Rend == 0)?1:2), 240 * ((*Rend == 0)?1:2));
-			if(r.right < Gens_Menu_Width) r.right = Gens_Menu_Width; // don't let the menu go multi-line, since it would squash the game view because AdjustWindowRectEx doesn't take it into account
+			//if(r.right < Gens_Menu_Width) r.right = Gens_Menu_Width; // don't let the menu go multi-line, since it would squash the game view because AdjustWindowRectEx doesn't take it into account
 			AdjustWindowRectEx(&r, GetWindowLong(hWnd, GWL_STYLE), 1, GetWindowLong(hWnd, GWL_EXSTYLE));
 			SetWindowPos(hWnd, NULL, Window_Pos.x, Window_Pos.y, r.right - r.left, r.bottom - r.top, SWP_NOZORDER | SWP_NOACTIVATE);
 		}
@@ -2368,7 +2368,7 @@ int PASCAL WinMain(HINSTANCE hInst,	HINSTANCE hPrevInst, LPSTR lpCmdLine, int nC
 
 	End_All(); //Modif N
 
-	ChangeDisplaySettings(NULL, 0);
+	//ChangeDisplaySettings(NULL, 0);
 
 	DestroyWindow(HWnd);
 
