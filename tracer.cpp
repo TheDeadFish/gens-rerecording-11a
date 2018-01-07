@@ -344,13 +344,14 @@ void trace_read_pad()
 		if(pad_value_pend >= 0) {
 		
 			// write frame
-			short frame_value = frame_read_delta() |
+			short frame_value = (frame_read_delta()+1) |
 				(pad_value_pend << 8);
 			if(!demo_output_file) { demo_output_file = 
 				fopen("demo_out.bin", "wb"); }
 			fwrite(&frame_value, 1, 2, demo_output_file);
 			if(MainMovie.Status!=MOVIE_PLAYING) { frame_value = 0;
-				fwrite(&frame_value, 1, 2, demo_output_file); }	
+				fwrite(&frame_value, 1, 2, demo_output_file); 
+				fclose(demo_output_file); demo_output_file = 0; }
 		}
 	
 	
